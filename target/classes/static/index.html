@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Passageiros - AprenderApi</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 30px 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #3DC9D9;
+            font-size: 1.6rem;
+            text-align: center;
+        }
+
+        p.subtitulo {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+        }
+
+        #mensagem-erro {
+            display: none;
+            background-color: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        th {
+            color: #F1C40F;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.82rem;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 7px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background-color: #1e293b;
+            color: #f8fafc;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3DC9D9;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background-color: rgba(0, 255, 163, 0.12);
+            border: 1px solid rgba(0, 255, 163, 0.35);
+            color: #00ffa3;
+            font-weight: 600;
+            font-size: 0.9rem;
+            user-select: none; /* Impede seleção/edição como texto comum */
+        }
+
+        button {
+            background-color: #3DC9D9;
+            color: #0f172a;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #28b0c0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Contagem de Passageiros por Parada</h1>
+    <p class="subtitulo">Informe os embarques e desembarques em cada parada (1 a 10)</p>
+
+    <div id="mensagem-erro"></div>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Parada</th>
+            <th>Embarques</th>
+            <th>Desembarques</th>
+            <th>Lotação (Somente Leitura)</th>
+            <th>Ação</th>
+        </tr>
+        </thead>
+        <tbody id="tabela-paradas">
+        <!-- As 10 linhas serão preenchidas automaticamente pelo JavaScript -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const API_URL = '/api/paradas';
+
+    // 1. Busca os dados na API (GET) e desenha as 10 linhas na tabela
+    async function carregarParadas() {
+        try {
+            const resposta = await fetch(API_URL);
+            const paradas = await resposta.json();
+
+            const tbody = document.getElementById('tabela-paradas');
+            tbody.innerHTML = '';
+
+            paradas.forEach(parada => {
+                const linha = document.createElement('tr');
+                linha.innerHTML = `
+                    <td><strong>Parada ${parada.numero}</strong></td>
+                    <td>
+                        <input type="number" id="emb-${parada.numero}" min="0" value="${parada.embarques}">
+                    </td>
+                    <td>
+                        <input type="number" id="des-${parada.numero}" min="0" value="${parada.desembarques}">
+                    </td>
+                    <td>
+                        <span class="status-badge">${parada.statusLotacao}</span>
+                    </td>
+                    <td>
+                        <button onclick="salvarParada(${parada.numero})">Atualizar</button>
+                    </td>
+                `;
+                tbody.appendChild(linha);
+            });
+        } catch (erro) {
+            mostrarErro('Não foi possível conectar com a API.');
+        }
+    }
+
+    // 2. Envia os valores digitados para a API (PUT) quando o usuário clica em "Atualizar"
+    async function salvarParada(numero) {
+        esconderErro();
+
+        const embarques = parseInt(document.getElementById(`emb-${numero}`).value) || 0;
+        const desembarques = parseInt(document.getElementById(`des-${numero}`).value) || 0;
+
+        try {
+            const resposta = await fetch(`${API_URL}/${numero}/movimentacao`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    embarques: embarques,
+                    desembarques: desembarques
+                })
+            });
+
+            if (!resposta.ok) {
+                // Pega a mensagem de erro enviada pelo ContagemService (ex: saldo negativo)
+                const mensagemErro = await resposta.text();
+                mostrarErro(mensagemErro);
+                await carregarParadas(); // Restaura os valores válidos na tela
+                return;
+            }
+
+            // Recarrega a tabela inteira para atualizar o cálculo acumulado das paradas seguintes!
+            await carregarParadas();
+        } catch (erro) {
+            mostrarErro('Erro de comunicação ao tentar salvar a parada.');
+        }
+    }
+
+    function mostrarErro(texto) {
+        const box = document.getElementById('mensagem-erro');
+        box.textContent = texto;
+        box.style.display = 'block';
+    }
+
+    function esconderErro() {
+        const box = document.getElementById('mensagem-erro');
+        box.style.display = 'none';
+    }
+
+    // Executa automaticamente assim que a página abre
+    carregarParadas();
+</script>
+
+</body>
+</html>
